@@ -1,4 +1,4 @@
-from django.contrib.auth import authenticate
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework import serializers
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
@@ -6,25 +6,24 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         email = attrs.get("email")
         password = attrs.get("password")
 
-        # 🔍 Find user by email
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError("User not registered")
+            raise serializers.ValidationError("Invalid credentials")
 
-        # 🔐 Authenticate using email as username
-        user = authenticate(username=user.email, password=password)
+        # 🔐 Check password
+        if not user.check_password(password):
+            raise serializers.ValidationError("Invalid credentials")
 
-        if user is None:
-            raise serializers.ValidationError("Invalid password")
+        # 🔐 Check active user
+        if not user.is_active:
+            raise serializers.ValidationError("Account disabled")
 
-        # 🔑 Generate tokens
+        # 🔐 Generate tokens
         refresh = self.get_token(user)
 
-        data = {
+        return {
             "refresh": str(refresh),
             "access": str(refresh.access_token),
             "user": UserSerializer(user).data
         }
-
-        return data
